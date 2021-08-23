@@ -23,6 +23,7 @@ import IFrameMeta from '@secret-agent/interfaces/IFrameMeta';
 import { LoadStatus } from '@secret-agent/interfaces/INavigation';
 import IPuppetDialog from '@secret-agent/interfaces/IPuppetDialog';
 import IFileChooserPrompt from '@secret-agent/interfaces/IFileChooserPrompt';
+import IDownload, { IDownloadState } from '@secret-agent/interfaces/IDownload';
 import FrameNavigations from './FrameNavigations';
 import CommandRecorder from './CommandRecorder';
 import FrameEnvironment from './FrameEnvironment';
@@ -634,6 +635,9 @@ export default class Tab extends TypedEventEmitter<ITabEventParams> {
     page.on('page-callback-triggered', this.onPageCallback.bind(this));
     page.on('dialog-opening', this.onDialogOpening.bind(this));
     page.on('filechooser', this.onFileChooser.bind(this));
+    page.on('download-started', this.onDownloadStarted.bind(this));
+    page.on('download-progress', this.onDownloadProgress.bind(this));
+    page.on('download-finished', this.onDownloadFinished.bind(this));
 
     // resource requested should registered before navigations so we can grab nav on new tab anchor clicks
     page.on('resource-will-be-requested', this.onResourceWillBeRequested.bind(this), true);
@@ -910,6 +914,28 @@ export default class Tab extends TypedEventEmitter<ITabEventParams> {
     this.sessionState.captureError(this.id, this.mainFrameId, `events.error`, error);
   }
 
+  /////// DOWNLOADS ////////////////////////////////////////////////////////////////////////////////
+
+  private onDownloadStarted(event: IPuppetPageEvents['download-started']): void {
+    this.emit('download-started', event);
+  }
+
+  private onDownloadProgress(event: IPuppetPageEvents['download-progress']): void {
+    this.emit('download-progress', {
+      ...event,
+      canceled: false,
+      complete: false,
+    });
+  }
+
+  private onDownloadFinished(event: IPuppetPageEvents['download-finished']): void {
+    this.emit('download-progress', {
+      ...event,
+      complete: true,
+      progress: 100,
+    });
+  }
+
   /////// DIALOGS //////////////////////////////////////////////////////////////////////////////////
 
   private onDialogOpening(event: IPuppetPageEvents['dialog-opening']): void {
@@ -943,6 +969,8 @@ interface ITabEventParams {
   'resource-requested': IResourceMeta;
   resource: IResourceMeta;
   dialog: IPuppetDialog;
+  'download-started': IDownload;
+  'download-progress': IDownloadState;
   'websocket-message': IWebsocketResourceMessage;
   'child-tab-created': Tab;
 }

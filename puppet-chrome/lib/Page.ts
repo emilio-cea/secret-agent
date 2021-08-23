@@ -23,6 +23,8 @@ import { assert, createPromise } from '@secret-agent/commons/utils';
 import { IBoundLog } from '@secret-agent/interfaces/ILog';
 import { CanceledPromiseError } from '@secret-agent/commons/interfaces/IPendingWaitEvent';
 import IRect from '@secret-agent/interfaces/IRect';
+import Path from 'path';
+import IPuppetFileDownload from '@secret-agent/interfaces/IPuppetFileDownload';
 import { DevtoolsSession } from './DevtoolsSession';
 import { NetworkManager } from './NetworkManager';
 import { Keyboard } from './Keyboard';
@@ -136,6 +138,8 @@ export class Page extends TypedEventEmitter<IPuppetPageEvents> implements IPuppe
       ['Page.javascriptDialogOpening', this.onJavascriptDialogOpening.bind(this)],
       ['Page.fileChooserOpened', this.onFileChooserOpened.bind(this)],
       ['Page.windowOpen', this.onWindowOpen.bind(this)],
+      ['Page.downloadWillBegin', this.onDownloadWillBegin.bind(this)],
+      ['Page.downloadProgress', this.onDownloadProgress.bind(this)],
     ]);
 
     this.isReady = this.initialize().catch(error => {
@@ -457,6 +461,48 @@ export class Page extends TypedEventEmitter<IPuppetPageEvents> implements IPuppe
 
   private onWindowOpen(event: WindowOpenEvent): void {
     this.windowOpenParams = event;
+  }
+
+  private onDownloadWillBegin(payload: Protocol.Page.DownloadWillBeginEvent) {
+    let originPage: Page = this.mainFrame.isLoaded ? this : null;
+    // If it's a new window download, report it on the opener page.
+    if (!originPage) {
+      // Resume the page creation with an error. The page will automatically close right
+      // after the download begins.
+      this.mainFrame.onStoppedLoading();
+      if (this.opener && this.opener) originPage = this.opener;
+    }
+    if (!originPage) return;
+
+    this.emit('download-started', {
+      id: payload.guid,
+      suggestedFilename: payload.suggestedFilename,
+      path: Path.join(this.browserContext.downloadsPath, payload.guid),
+      url: payload.url,
+    });
+  }
+
+  private onDownloadProgress(event: Protocol.Page.DownloadProgressEvent) {
+    const download = <IPuppetPageEvents['download-finished']>{
+      id: event.guid,
+      totalBytes: event.totalBytes,
+      canceled: event.state === Protocol.Page.DownloadProgressEventState.Canceled,
+    };
+
+    const isFinished = event.state !== Protocol.Page.DownloadProgressEventState.InProgress;
+
+    if (isFinished) {
+      this.emit('download-finished', download);
+    } else {
+      const progress = <IPuppetPageEvents['download-progress']>{
+        ...download,
+        progress: 0,
+      };
+      if (event.totalBytes) {
+        progress.progress = Math.round((event.receivedBytes * 100) / event.totalBytes);
+      }
+      this.emit('download-progress', progress);
+    }
   }
 
   private onJavascriptDialogOpening(dialog: JavascriptDialogOpeningEvent): void {

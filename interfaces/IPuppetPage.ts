@@ -65,4 +65,12 @@ export interface IPuppetPageEvents extends IPuppetFrameManagerEvents, IPuppetNet
   filechooser: { frameId: string; selectMultiple: boolean; objectId: string };
   'page-error': { frameId: string; error: Error };
   'page-callback-triggered': { name: string; frameId: string; payload: any };
+  'download-started': {
+    id: string;
+    path: string;
+    suggestedFilename: string;
+    url: string;
+  };
+  'download-progress': { id: string; totalBytes: number; progress: number };
+  'download-finished': { id: string; totalBytes: number; canceled: boolean };
 }

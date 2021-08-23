@@ -8,6 +8,7 @@ import IWaitForOptions from '@secret-agent/interfaces/IWaitForOptions';
 import IScreenshotOptions from '@secret-agent/interfaces/IScreenshotOptions';
 import IFrameMeta from '@secret-agent/interfaces/IFrameMeta';
 import IFileChooserPrompt from '@secret-agent/interfaces/IFileChooserPrompt';
+import IDownload, { IDownloadState } from '@secret-agent/interfaces/IDownload';
 import CoreCommandQueue from './CoreCommandQueue';
 import CoreEventHeap from './CoreEventHeap';
 import IWaitForResourceFilter from '../interfaces/IWaitForResourceFilter';
@@ -17,6 +18,7 @@ import ConnectionToCore from '../connections/ConnectionToCore';
 import CoreFrameEnvironment from './CoreFrameEnvironment';
 import { createDialog } from './Dialog';
 import CoreSession from './CoreSession';
+import Download, { createDownload } from './Download';
 
 export default class CoreTab implements IJsPathEventTarget {
   public tabId: number;
@@ -32,6 +34,7 @@ export default class CoreTab implements IJsPathEventTarget {
   private readonly connection: ConnectionToCore;
   private readonly mainFrameId: number;
   private readonly coreSession: CoreSession;
+  private readonly downloadsById = new Map<string, Download>();
 
   constructor(
     meta: ISessionMeta & { sessionName: string },
@@ -57,6 +60,7 @@ export default class CoreTab implements IJsPathEventTarget {
     this.eventHeap.registerEventInterceptors({
       resource: createResource.bind(null, resolvedThis),
       dialog: createDialog.bind(null, resolvedThis),
+      'download-started': this.createDownload.bind(resolvedThis),
     });
   }
 
@@ -175,5 +179,17 @@ export default class CoreTab implements IJsPathEventTarget {
     await this.commandQueue.run('Tab.close');
     const session = this.connection.getSession(this.sessionId);
     session?.removeTab(this);
+  }
+
+  private createDownload(download: IDownload): Download {
+    const newDownload = createDownload(Promise.resolve(this), download);
+    this.downloadsById.set(download.id, newDownload);
+    return newDownload;
+  }
+
+  private onDownloadProgress(data: IDownloadState): void {
+    const download = this.downloadsById.get(data.id);
+    if (!download) return;
+    Object.assign(download, data);
   }
 }

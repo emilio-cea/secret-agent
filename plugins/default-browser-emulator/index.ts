@@ -15,6 +15,10 @@ import IUserAgentOption from '@secret-agent/interfaces/IUserAgentOption';
 import BrowserEngine from '@secret-agent/plugin-utils/lib/BrowserEngine';
 import IGeolocation from '@secret-agent/interfaces/IGeolocation';
 import IHttp2ConnectSettings from '@secret-agent/interfaces/IHttp2ConnectSettings';
+import IPuppetContext from '@secret-agent/interfaces/IPuppetContext';
+import * as Path from 'path';
+import * as os from 'os';
+import * as Fs from 'fs';
 import Viewports from './lib/Viewports';
 import setWorkerDomOverrides from './lib/setWorkerDomOverrides';
 import setPageDomOverrides from './lib/setPageDomOverrides';
@@ -43,6 +47,8 @@ const dataLoader = new DataLoader(__dirname);
 export const latestBrowserEngineId = 'chrome-88-0';
 export const latestChromeBrowserVersion = { major: '88', minor: '0' };
 
+let sessionDirCounter = 0;
+
 @BrowserEmulatorClassDecorator
 export default class DefaultBrowserEmulator extends BrowserEmulator {
   public static id = dataLoader.pkg.name.replace('@secret-agent/', '');
@@ -51,6 +57,7 @@ export default class DefaultBrowserEmulator extends BrowserEmulator {
   public locale: string;
   public viewport: IViewport;
   public geolocation: IGeolocation;
+  public userDataDir: string;
 
   protected readonly data: IBrowserData;
   private readonly domOverridesBuilder: DomOverridesBuilder;
@@ -109,6 +116,11 @@ export default class DefaultBrowserEmulator extends BrowserEmulator {
     configureHttp2Session(this, this.data, request, settings);
   }
 
+  public async onNewPuppetContext(context: IPuppetContext): Promise<any> {
+    await Fs.promises.mkdir(`${this.userDataDir}/downloads`);
+    await context.enableDownloads(`${this.userDataDir}/downloads`);
+  }
+
   public onNewPuppetPage(page: IPuppetPage): Promise<any> {
     // Don't await here! we want to queue all these up to run before the debugger resumes
     const devtools = page.devtoolsSession;
@@ -154,6 +166,13 @@ export default class DefaultBrowserEmulator extends BrowserEmulator {
       disableDevtools?: boolean;
     },
   ): void {
+    const dataDir = Path.join(
+      os.tmpdir(),
+      browserEngine.fullVersion.replace('.', '-'),
+      `${String(Date.now()).substr(0, 10)}-${(sessionDirCounter += 1)}`,
+    );
+    browserEngine.userDataDir = dataDir;
+
     configureBrowserLaunchArgs(browserEngine, options);
   }
 }

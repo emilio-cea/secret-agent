@@ -61,6 +61,7 @@ export default class CoreTab implements IJsPathEventTarget {
       resource: createResource.bind(null, resolvedThis),
       dialog: createDialog.bind(null, resolvedThis),
       'download-started': this.createDownload.bind(resolvedThis),
+      'download-progress': this.onDownloadProgress.bind(resolvedThis),
     });
   }
 

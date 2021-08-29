@@ -8,7 +8,8 @@ import IWaitForOptions from '@secret-agent/interfaces/IWaitForOptions';
 import IScreenshotOptions from '@secret-agent/interfaces/IScreenshotOptions';
 import IFrameMeta from '@secret-agent/interfaces/IFrameMeta';
 import IFileChooserPrompt from '@secret-agent/interfaces/IFileChooserPrompt';
-import IDownload, { IDownloadState } from '@secret-agent/interfaces/IDownload';
+import IDownload from '@secret-agent/interfaces/IDownload';
+import { URL } from 'url';
 import CoreCommandQueue from './CoreCommandQueue';
 import CoreEventHeap from './CoreEventHeap';
 import IWaitForResourceFilter from '../interfaces/IWaitForResourceFilter';
@@ -60,8 +61,7 @@ export default class CoreTab implements IJsPathEventTarget {
     this.eventHeap.registerEventInterceptors({
       resource: createResource.bind(null, resolvedThis),
       dialog: createDialog.bind(null, resolvedThis),
-      'download-started': this.createDownload.bind(resolvedThis),
-      'download-progress': this.onDownloadProgress.bind(resolvedThis),
+      download: this.createDownload.bind(this),
     });
   }
 
@@ -182,15 +182,19 @@ export default class CoreTab implements IJsPathEventTarget {
     session?.removeTab(this);
   }
 
-  private createDownload(download: IDownload): Download {
-    const newDownload = createDownload(Promise.resolve(this), download);
-    this.downloadsById.set(download.id, newDownload);
-    return newDownload;
+  public async deleteDownload(id: string): Promise<void> {
+    await this.commandQueue.run('Tab.deleteDownload', id);
   }
 
-  private onDownloadProgress(data: IDownloadState): void {
-    const download = this.downloadsById.get(data.id);
-    if (!download) return;
-    Object.assign(download, data);
+  private createDownload(download: IDownload): Download {
+    const newDownload = createDownload(this, download);
+    this.downloadsById.set(download.id, newDownload);
+    newDownload.downloadUrl = this.connection.hostOrError.then(host => {
+      if (host instanceof Error) return null;
+      const hostUrl = new URL(download.downloadPath, host);
+      hostUrl.protocol = 'http:';
+      return hostUrl.href;
+    });
+    return newDownload;
   }
 }

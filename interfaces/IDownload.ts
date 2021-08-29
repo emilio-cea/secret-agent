@@ -3,6 +3,7 @@ export default interface IDownload {
   path: string;
   suggestedFilename: string;
   url: string;
+  downloadPath: string;
 }
 
 export interface IDownloadState {

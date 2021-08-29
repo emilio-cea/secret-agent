@@ -24,6 +24,7 @@ import {
   IDevtoolsEventMessage,
   IDevtoolsResponseMessage,
 } from '@secret-agent/interfaces/IDevtoolsSession';
+import * as Fs from 'fs';
 import { Page } from './Page';
 import { Browser } from './Browser';
 import { DevtoolsSession } from './DevtoolsSession';
@@ -236,6 +237,9 @@ export class BrowserContext
         if (err instanceof CanceledPromiseError) return;
         throw err;
       });
+    }
+    if (this.downloadsPath) {
+      await Fs.promises.rmdir(this.downloadsPath, { recursive: true }).catch(() => null);
     }
     removeEventListeners(this.eventListeners);
     this.browser.browserContextsById.delete(this.id);

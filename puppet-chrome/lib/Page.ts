@@ -463,12 +463,12 @@ export class Page extends TypedEventEmitter<IPuppetPageEvents> implements IPuppe
   }
 
   private onDownloadWillBegin(payload: Protocol.Page.DownloadWillBeginEvent) {
-    let originPage: Page = this.mainFrame.isLoaded ? this : null;
+    let originPage: Page = this.mainFrame?.isLoaded ? this : null;
     // If it's a new window download, report it on the opener page.
     if (!originPage) {
       // Resume the page creation with an error. The page will automatically close right
       // after the download begins.
-      this.mainFrame.onStoppedLoading();
+      this.mainFrame?.onStoppedLoading();
       if (this.opener && this.opener) originPage = this.opener;
     }
     if (!originPage) return;

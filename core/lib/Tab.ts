@@ -24,6 +24,9 @@ import { LoadStatus } from '@secret-agent/interfaces/INavigation';
 import IPuppetDialog from '@secret-agent/interfaces/IPuppetDialog';
 import IFileChooserPrompt from '@secret-agent/interfaces/IFileChooserPrompt';
 import IDownload, { IDownloadState } from '@secret-agent/interfaces/IDownload';
+import { encode } from 'querystring';
+import * as Fs from 'fs';
+import { existsAsync } from '@secret-agent/commons/fileUtils';
 import FrameNavigations from './FrameNavigations';
 import CommandRecorder from './CommandRecorder';
 import FrameEnvironment from './FrameEnvironment';
@@ -140,6 +143,7 @@ export default class Tab extends TypedEventEmitter<ITabEventParams> {
     this.commandRecorder = new CommandRecorder(this, this.session, this.id, this.mainFrameId, [
       this.focus,
       this.dismissDialog,
+      this.deleteDownload,
       this.getFrameEnvironments,
       this.goto,
       this.goBack,
@@ -436,6 +440,12 @@ export default class Tab extends TypedEventEmitter<ITabEventParams> {
 
   public dismissDialog(accept: boolean, promptText?: string): Promise<void> {
     return this.puppetPage.dismissDialog(accept, promptText);
+  }
+
+  public async deleteDownload(id: string): Promise<void> {
+    const download = this.session.downloadsById.get(id);
+    if (!download) return;
+    if (await existsAsync(download.path)) await Fs.promises.unlink(download.path);
   }
 
   public async waitForNewTab(options: IWaitForOptions = {}): Promise<Tab> {
@@ -917,7 +927,13 @@ export default class Tab extends TypedEventEmitter<ITabEventParams> {
   /////// DOWNLOADS ////////////////////////////////////////////////////////////////////////////////
 
   private onDownloadStarted(event: IPuppetPageEvents['download-started']): void {
-    this.emit('download-started', event);
+    const broadcast = event as IDownload;
+    broadcast.downloadPath = `/downloads?${encode({
+      id: event.id,
+      sessionId: this.sessionId,
+    })}`;
+    this.session.downloadsById.set(event.id, broadcast);
+    this.emit('download', broadcast);
   }
 
   private onDownloadProgress(event: IPuppetPageEvents['download-progress']): void {
@@ -969,7 +985,7 @@ interface ITabEventParams {
   'resource-requested': IResourceMeta;
   resource: IResourceMeta;
   dialog: IPuppetDialog;
-  'download-started': IDownload;
+  download: IDownload;
   'download-progress': IDownloadState;
   'websocket-message': IWebsocketResourceMessage;
   'child-tab-created': Tab;

@@ -57,7 +57,6 @@ export default class DefaultBrowserEmulator extends BrowserEmulator {
   public locale: string;
   public viewport: IViewport;
   public geolocation: IGeolocation;
-  public userDataDir: string;
 
   protected readonly data: IBrowserData;
   private readonly domOverridesBuilder: DomOverridesBuilder;
@@ -117,8 +116,9 @@ export default class DefaultBrowserEmulator extends BrowserEmulator {
   }
 
   public async onNewPuppetContext(context: IPuppetContext): Promise<any> {
-    await Fs.promises.mkdir(`${this.userDataDir}/downloads`);
-    await context.enableDownloads(`${this.userDataDir}/downloads`);
+    const userDataDir = this.browserEngine.userDataDir;
+    await Fs.promises.mkdir(`${userDataDir}/downloads`, { recursive: true });
+    await context.enableDownloads(`${userDataDir}/downloads`);
   }
 
   public onNewPuppetPage(page: IPuppetPage): Promise<any> {
